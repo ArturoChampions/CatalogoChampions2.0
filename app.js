@@ -159,18 +159,18 @@ const matchesStructuredQuery = p => {
   const requestedModel = `${requestedIphone[1]}${requestedIphone[2] ? ` ${requestedIphone[2]}` : ""}`;
   const productModel = normalize(iphoneModel(p));
   if (requestedIphone[2] === "pro") return productModel === requestedModel || productModel.startsWith(`${requestedModel} `);
-  return requestedIphone[2] ? productModel === requestedModel : productModel.startsWith(`${requestedModel} `) || productModel === requestedModel;
+  return requestedIphone[1] ? productModel === requestedModel : productModel.startsWith(`${requestedModel} `) || productModel === requestedModel;
 };
 
 const hasActiveFilters = () => Boolean(state.family || state.subfamily || state.connectivity || state.capacity);
 
 const updateClearButtonState = () => {
   const shouldShow = Boolean(state.query || hasActiveFilters());
-  $("clearButton").classList.toggle("hidden", !shouldShow);
+  if ($("clearButton")) $("clearButton").classList.toggle("hidden", !shouldShow);
 };
 
 function clearAllFiltersAndSearch() {
-  $("searchInput").value = "";
+  if ($("searchInput")) $("searchInput").value = "";
   state.query = "";
   state.family = null;
   state.subfamily = null;
@@ -181,7 +181,7 @@ function clearAllFiltersAndSearch() {
   renderSectionPicker();
   renderCapacityFilters();
   renderProducts();
-  $("searchInput").focus();
+  if ($("searchInput")) $("searchInput").focus();
 }
 function visibleProducts() {
   const tokens = queryTokens(state.query);
@@ -204,6 +204,7 @@ function visibleProducts() {
 }
 
 function renderFilters() {
+  if (!$("filters")) return;
   const sortedFamilies = [...new Set(state.products.map(topFamily))].sort((a, b) => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" }));
   $("filters").innerHTML = sortedFamilies.map(f => `<button class="filter ${f === state.family ? "active" : ""}" data-family="${f}">${f}</button>`).join("");
   $("filters").querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -223,7 +224,7 @@ function renderFilters() {
 function renderCapacityFilters() {
   const el = $("capacityFilters");
   if (!el) return;
-  const show = supportsCapacity(state.family) && Boolean(state.subfamily) && !state.query;
+  const show = supportsCapacity(state.family) && Boolean(state.subfamily);
   el.classList.toggle("hidden", !show);
   if (!show) { el.innerHTML = ""; state.capacity = null; return; }
   const order = ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB", "4TB", "8TB"];
@@ -238,6 +239,7 @@ function renderCapacityFilters() {
 
 function renderSectionPicker() {
   const picker = $("sectionPicker");
+  if (!picker) return;
   const config = pickerConfig[state.family];
   if (!config || state.query) { picker.classList.add("hidden"); picker.innerHTML = ""; return }
   const models = config.items();
@@ -274,6 +276,7 @@ function renderSectionPicker() {
 }
 
 function renderProducts() {
+  if (!$("catalog")) return;
   const products = visibleProducts();
   const sectionLanding = pickerConfig[state.family] && !state.subfamily && !state.query;
   const categoryLanding = !state.family && !state.query;
@@ -288,26 +291,33 @@ function renderProducts() {
 }
 
 function showProduct(p) {
-  $("detailImage").src = imageFor(p); $("detailImage").alt = `Imagen de ${p.name}`; $("detailFamily").textContent = `${p.family} · ${p.status}`;
-  $("detailName").textContent = p.name; $("detailReference").textContent = formatReference(p.id); $("detailPrice").textContent = money(p.price);
+  if (!p) return;
+  if ($("detailImage")) { $("detailImage").src = imageFor(p); $("detailImage").alt = `Imagen de ${p.name}`; }
+  if ($("detailFamily")) $("detailFamily").textContent = `${p.family} · ${p.status}`;
+  if ($("detailName")) $("detailName").textContent = p.name;
+  if ($("detailReference")) $("detailReference").textContent = formatReference(p.id);
+  if ($("detailPrice")) $("detailPrice").textContent = money(p.price);
   const barcode = barcodeSvg(p.ean);
-  $("barcodeBlock").classList.toggle("hidden", !barcode); $("barcodeUnavailable").classList.toggle("hidden", Boolean(barcode));
-  $("barcodeGraphic").innerHTML = barcode; $("barcodeNumber").textContent = eanDigits(p.ean);
+  if ($("barcodeBlock")) $("barcodeBlock").classList.toggle("hidden", !barcode);
+  if ($("barcodeUnavailable")) $("barcodeUnavailable").classList.toggle("hidden", Boolean(barcode));
+  if ($("barcodeGraphic")) $("barcodeGraphic").innerHTML = barcode;
+  if ($("barcodeNumber")) $("barcodeNumber").textContent = eanDigits(p.ean);
   const specs = [["Modelo fabricante", p.modelCode], ["EAN", p.ean], ["Configuración", p.details]].filter(([, v]) => v);
-  $("detailSpecs").innerHTML = specs.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
-  $("productDialog").showModal();
+  if ($("detailSpecs")) $("detailSpecs").innerHTML = specs.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  if ($("productDialog")) $("productDialog").showModal();
 }
 
 let scannerControls = null;
 function stopScanner() {
   scannerControls?.stop(); scannerControls = null;
   const video = $("scannerVideo");
-  video.srcObject?.getTracks().forEach(track => track.stop()); video.srcObject = null;
-  if ($("scannerDialog").open) $("scannerDialog").close();
+  if (video) { video.srcObject?.getTracks().forEach(track => track.stop()); video.srcObject = null; }
+  if ($("scannerDialog") && $("scannerDialog").open) $("scannerDialog").close();
 }
 
 async function startScanner() {
   const dialog = $("scannerDialog"), status = $("scannerStatus");
+  if (!dialog || !status) return;
   if (!navigator.mediaDevices?.getUserMedia) { alert("Este navegador no permite acceder a la cámara. Abre la web con Safari y comprueba los permisos."); return }
   if (!window.ZXingBrowser) { alert("No se ha podido cargar el lector de códigos. Recarga la página e inténtalo de nuevo."); return }
   dialog.showModal(); status.textContent = "Iniciando cámara…";
@@ -330,13 +340,13 @@ async function startScanner() {
         stopScanner(); showProduct(product);
       } else {
         status.textContent = `El código ${rawCode} no está en el catálogo`;
-        $("searchInput").value = rawCode; state.query = rawCode; renderProducts();
+        if ($("searchInput")) { $("searchInput").value = rawCode; state.query = rawCode; renderProducts(); }
       }
     });
     status.textContent = "Coloca el EAN dentro del recuadro.";
   } catch (error) {
     stopScanner();
-    alert(error?.name === "NotAllowedError" ? "No se ha autorizado la cámara. Actívala en Ajustes > Safari > Cámara y vuelve a intentarlo." : "No se pudo iniciar la cámara. Comprueba el permiso y que la web esté abierta mediante HTTPS.");
+    alert("No se pudo iniciar la cámara. Comprueba los permisos de tu navegador.");
   }
 }
 
@@ -345,34 +355,59 @@ async function start() {
     state.products = Array.isArray(window.CHAMPION_CATALOG)
       ? window.CHAMPION_CATALOG
       : await fetch("catalog.json?v=43").then(r => { if (!r.ok) throw Error(); return r.json() });
-// ... viene de la función start() donde se corta tu código:
     renderFilters(); renderSectionPicker(); renderCapacityFilters(); renderProducts();
-  } catch { $("catalog").innerHTML = '<section class="empty glass"><h2>No se pudo cargar el catálogo</h2><p>Comprueba la conexión y vuelve a intentarlo.</p></section>' }
+  } catch { if ($("catalog")) $("catalog").innerHTML = '<section class="empty glass"><h2>No se pudo cargar el catálogo</h2></section>' }
 }
 
-$("searchInput").addEventListener("input", e => {
-  state.query = e.target.value;
-  if (state.query && state.family) {
-    state.family = null; state.subfamily = null; state.connectivity = null; state.capacity = null;
+if ($("searchInput")) {
+  $("searchInput").addEventListener("input", e => {
+    state.query = e.target.value;
+    if (state.query) {
+      const qLower = normalize(state.query);
+      let detectedFamily = null;
+      if (qLower.includes("iphone")) detectedFamily = "iPhone";
+      else if (qLower.includes("ipad")) detectedFamily = "iPad";
+      else if (qLower.includes("macbook")) detectedFamily = "MacBook";
+      else if (qLower.includes("imac") || qLower.includes("mac mini") || qLower.includes("mac studio")) detectedFamily = "Mac";
+      else if (qLower.includes("watch")) detectedFamily = "Apple Watch";
+      else if (qLower.includes("airpods") || qLower.includes("homepod")) detectedFamily = "Audio";
+
+      if (detectedFamily) {
+        state.family = detectedFamily;
+        const matchedProduct = state.products.find(p => topFamily(p) === detectedFamily && qLower.includes(normalize(subfamilyFor(p))));
+        if (matchedProduct) {
+          state.subfamily = subfamilyFor(matchedProduct);
+        } else {
+          const subfamilies = [...new Set(state.products.filter(p => topFamily(p) === detectedFamily).map(subfamilyFor).filter(Boolean))];
+          const foundSub = subfamilies.find(sub => qLower.includes(normalize(sub)) || normalize(sub).split(" ").some(word => word.length > 2 && qLower.includes(word)));
+          if (foundSub) state.subfamily = foundSub;
+        }
+      }
+    }
     renderFilters();
-  }
-  renderSectionPicker();
-  renderCapacityFilters();
-  updateClearButtonState();
-  renderProducts();
-});
+    renderSectionPicker();
+    renderCapacityFilters();
+    updateClearButtonState();
+    renderProducts();
+  });
+}
 
-$("clearButton").onclick = clearAllFiltersAndSearch;
-$("scanButton").onclick = startScanner;
-$("closeScanner").onclick = stopScanner;
-$("scannerDialog").addEventListener("cancel", event => { event.preventDefault(); stopScanner() });
-$("scannerDialog").addEventListener("click", event => { if (event.target === $("scannerDialog")) stopScanner() });
-$("closeDialog").onclick = () => $("productDialog").close();
-$("productDialog").addEventListener("click", e => { if (e.target === $("productDialog")) $("productDialog").close() });
+if ($("clearButton")) $("clearButton").onclick = clearAllFiltersAndSearch;
+if ($("scanButton")) $("scanButton").onclick = startScanner;
+if ($("closeScanner")) $("closeScanner").onclick = stopScanner;
 
-let installPrompt;
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; $("installButton").classList.remove("hidden") });
-$("installButton").onclick = async () => { if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $("installButton").classList.add("hidden") } else { alert("En Safari, pulsa Compartir y después Añadir a pantalla de inicio.") } };
+if ($("scannerDialog")) {
+  $("scannerDialog").addEventListener("cancel", event => { event.preventDefault(); stopScanner() });
+  $("scannerDialog").addEventListener("click", event => { if (event.target === $("scannerDialog")) stopScanner() });
+}
+if ($("closeDialog")) $("closeDialog").onclick = () => $("productDialog").close();
+if ($("productDialog")) $("productDialog").addEventListener("click", e => { if (e.target === $("productDialog")) $("productDialog").close() });
+
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; if ($("installButton")) $("installButton").classList.remove("hidden") });
+if ($("installButton")) {
+  $("installButton").onclick = async () => { if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $("installButton").classList.add("hidden") } else { alert("En Safari, pulsa Compartir y después Añadir a pantalla de inicio.") } };
+}
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
 
 start();
